@@ -109,12 +109,12 @@ logger.info({ phone: sanitizePhone(phone), state }, 'State transition');
 
 JSON format in production. Pretty printed in development. Sensitive data sanitized.
 
-## Evolution API Integration
+## Z-API Integration
 
-Evolution API for WhatsApp messaging:
+Z-API for WhatsApp messaging:
 
-- Native WhatsApp Web support
+- WhatsApp Business API integration
 - Webhook-based message reception
-- Simple REST API for sending
-- No session management needed
+- Simple REST API for sending messages
+- Reliable message delivery with status tracking
 

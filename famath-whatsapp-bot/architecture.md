@@ -128,7 +128,7 @@ Specialized tools for external integrations:
 - **validation.ts**: CPF, email, CEP validation
 - **viacep.ts**: Address lookup via ViaCEP API
 - **protocol.ts**: Protocol and password generation
-- **zapi.ts**: WhatsApp message sending via Evolution API
+- **zapi.ts**: WhatsApp message sending via Z-API
 - **supabase.ts**: Database CRUD operations
 
 Separation of concerns. Reusable utilities. Type-safe interfaces.

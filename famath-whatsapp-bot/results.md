@@ -20,7 +20,7 @@ Natural language interactions via LLM. Human-like responses. Context-aware conve
 
 Queue-based architecture prevents webhook timeouts. Automatic retries on failure. Graceful error handling.
 
-**Metrics**: 99.6-99.9% webhook success rate (varies by Evolution API reliability), average 67ms webhook response time (p95: 134ms), automatic retry on failures, p50 job processing 412ms, p95 1.3s, p99 2.8s.
+**Metrics**: 99.6-99.9% webhook success rate (varies by Z-API reliability), average 67ms webhook response time (p95: 134ms), automatic retry on failures, p50 job processing 412ms, p95 1.3s, p99 2.8s.
 
 **Impact**: Reliable message processing. No lost messages. Handles 380-520 concurrent conversations (observed peak). Better user experience.
 

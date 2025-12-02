@@ -2,7 +2,7 @@
 
 ## Webhook Timeout Prevention
 
-**Problem**: Evolution API webhooks timeout if processing takes too long. Need immediate response.
+**Problem**: Z-API webhooks timeout if processing takes too long. Need immediate response.
 
 **Solution**: Queue-based architecture. Webhook handler returns 200 immediately. Processing happens asynchronously in BullMQ worker.
 
@@ -82,7 +82,7 @@ Timeout handling. Clear error messages. Manual fallback.
 
 ## Message Deduplication
 
-**Problem**: Evolution API can send duplicate messages. Need to prevent duplicate processing. Timestamp-based IDs can collide.
+**Problem**: Z-API can send duplicate messages. Need to prevent duplicate processing. Timestamp-based IDs can collide.
 
 **Solution**: Composite job ID with phone, timestamp, and message hash. BullMQ deduplication with TTL.
 

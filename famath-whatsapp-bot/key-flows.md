@@ -2,7 +2,7 @@
 
 ## Webhook Reception Flow
 
-Evolution API → Fastify webhook → validation → queue:
+Z-API → Fastify webhook → validation → queue:
 
 ```typescript
 fastify.post('/webhook/whatsapp', async (request, reply) => {
