@@ -1,63 +1,92 @@
 # Bruno Alves – Technical Case Studies
 
-This repository presents a selection of technical case studies from systems I have architected and delivered in production. Each case focuses on engineering decisions, architectural reasoning, and the implementation approaches used to solve real operational problems.
+This repository contains a curated set of technical case studies from systems I designed and delivered in production. Each case documents engineering reasoning, architectural decisions, operational constraints, and representative implementation patterns.
 
-These cases do not represent all projects I have worked on, but highlight key systems that illustrate my work across fullstack engineering, backend architecture, integrations, data workflows, and AI-driven automations.
+These are selected projects, not an exhaustive list. The focus is on systems that illustrate my work across backend architecture, distributed flows, automation, real-time pipelines, and LLM-driven components.
 
-**Tech Stack**: Node.js, TypeScript, Python, Go, React, Next.js, FastAPI, Fastify, PostgreSQL, Supabase, Redis, WebSocket, LLM integrations (OpenAI, Groq), payment gateways, and observability tools.
+---
 
 ## Purpose
 
-The goal of this repository is to document how specific systems were designed, why certain architectural choices were made, and how the solutions were implemented in practice. The emphasis is on clarity, trade-offs, and real-world constraints rather than theoretical patterns.
+The goal of this repository is to provide clear, engineering-oriented documentation of:
+
+- how the systems were structured  
+- why specific architectural decisions were made  
+- which constraints shaped the design  
+- how the solutions were implemented  
+- what trade-offs were accepted  
+
+The emphasis is on architecture and applied engineering, not code dumps or theoretical patterns.
+
+---
 
 ## Structure
 
-Each case is isolated in its own directory and contains:
+Each case is isolated in its own directory and includes:
 
-- **overview.md**  
-  High-level summary of the system and the business problem.
+### **overview.md**  
+High-level description of the system and the operational problem.
 
-- **architecture.md**  
-  Architectural structure, components, boundaries, and design rationale.
+### **architecture.md**  
+Architecture, components, boundaries, and design rationale.
 
-- **key-flows.md**  
-  Key operational or technical flows that define the system behavior.
+### **key-flows.md**  
+Core flows that define system behavior.
 
-- **technical-decisions.md**  
-  Reasoning behind major technical choices and alternatives considered.
+### **technical-decisions.md**  
+Major technical choices and alternatives considered.
 
-- **challenges.md**  
-  Issues encountered and the engineering approaches used to resolve them.
+### **challenges.md**  
+Non-trivial problems and how they were resolved.
 
-- **representative-snippets.md**  
-  Code snippets demonstrating architectural patterns and implementation quality.
+### **representative-snippets.md**  
+Selected code excerpts demonstrating architectural patterns.
 
-- **results.md**  
-  Impact delivered and outcomes achieved.
+### **results.md**  
+Delivered outcomes, stability, and business impact.
 
-## Cases Included
+All cases follow the same structure for consistency and clarity.
 
-The cases documented in this repository cover systems in the areas of:
+---
 
-- **Enrollment and Academic Process Automation**
-  - `famath-enrollment-portal` - Student enrollment portal with payment integration
-  - `famath-enrollment-admin` - Administrative enrollment management system
-  - `famath-whatsapp-bot` - Conversational WhatsApp agent for enrollment automation
+## Included Case Studies
 
-- **CRM and Lead Management**
-  - `inmov-crm-platform` - CRM with AI-powered lead qualification via WhatsApp
+### Enrollment and Academic Systems
+- **famath-enrollment-portal** – Student enrollment portal with pricing engine and document intake  
+- **famath-enrollment-admin** – Administrative enrollment and validation flow  
+- **famath-whatsapp-agent** – Deterministic conversational agent for enrollment automation
 
-- **Financial SaaS**
-  - `dre-saas-platform` - Multi-tenant financial SaaS for DRE (Income Statement) generation
+### CRM and Lead Intelligence
+- **inmov-crm-platform** – CRM platform with WhatsApp ingestion and AI SDR agent
 
-- **Analytics and Data Platforms**
-  - `silva-analytics-platform` - Analytics and customer intelligence platform with RFM analysis
+### Financial SaaS
+- **dre-saas-platform** – Multi-tenant DRE and financial control system (FastAPI + Supabase)
 
-- **Observability and Infrastructure**
-  - `opsforge-platform` - SaaS observability platform for integrations and webhook delivery
+### Analytics and Data
+- **silva-analytics-platform** – Customer intelligence and analytics platform with RFM modeling
 
-Each case includes details relevant to architecture, implementation, and operational design.
+### Observability and Integrations
+- **opsforge-platform** – Webhook delivery, retries, and monitoring (Go + Next.js)
+
+---
+
+## Technology Scope
+
+The systems documented here involve:
+
+- **Languages:** Python, TypeScript, JavaScript, Go  
+- **Backend:** FastAPI, Fastify, Node.js, Prisma, SQLAlchemy  
+- **Frontend:** React, Next.js  
+- **Datastores:** PostgreSQL, Supabase, Redis  
+- **Infrastructure:** Docker, Render, Vercel  
+- **Real-Time & Messaging:** SSE, Webhooks, BullMQ  
+- **AI & Automation:** LLM orchestration, domain-bounded agents, OpenAI, Groq  
+
+Each case focuses on applied engineering and architectural clarity.
+
+---
 
 ## Notes
 
-All client-specific data, source code, and proprietary information are omitted. Only architectural reasoning, patterns, and high-level design details are included.
+No proprietary code or client-specific data is included.  
+All examples and explanations are limited to architectural reasoning and high-level implementation concepts.
