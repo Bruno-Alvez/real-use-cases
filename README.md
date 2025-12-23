@@ -1,92 +1,81 @@
-# Bruno Alves – Technical Case Studies
+# Engineering Case Studies
 
-This repository contains a curated set of technical case studies from systems I designed and delivered in production. Each case documents engineering reasoning, architectural decisions, operational constraints, and representative implementation patterns.
+This repository documents real-world systems I designed, built, and delivered end-to-end in production. Each case study represents a complete project where I was responsible for architecture decisions, implementation, and operational concerns.
 
-These are selected projects, not an exhaustive list. The focus is on systems that illustrate my work across backend architecture, distributed flows, automation, real-time pipelines, and LLM-driven components.
+## About This Repository
 
----
+These case studies are based on actual production systems I led. Due to client confidentiality and proprietary constraints, I cannot share the original source code. Instead, I've created comprehensive documentation with representative code snippets that demonstrate the architectural patterns, technical decisions, and implementation approaches used in each system.
 
-## Purpose
+The code examples are carefully crafted to reflect the real implementation patterns while ensuring no sensitive data, proprietary logic, or client-specific details are exposed. They serve as evidence of the engineering practices applied in production.
 
-The goal of this repository is to provide clear, engineering-oriented documentation of:
+## What You'll Find
 
-- how the systems were structured  
-- why specific architectural decisions were made  
-- which constraints shaped the design  
-- how the solutions were implemented  
-- what trade-offs were accepted  
+Each case study includes:
 
-The emphasis is on architecture and applied engineering, not code dumps or theoretical patterns.
+- **System architecture** – Component boundaries, data flow, failure handling
+- **Technical decisions** – Rationale, alternatives considered, trade-offs
+- **Key flows** – Core system behaviors and interactions
+- **Implementation patterns** – Representative code demonstrating architectural choices
+- **Operational concerns** – Reliability, observability, security boundaries
+- **Results and measurement** – Outcomes observed in production, metrics, and measurement guidance
 
----
+These documents are written from an engineering perspective, focusing on how systems were built, why certain choices were made, and what constraints were encountered.
 
-## Structure
+## Case Studies
 
-Each case is isolated in its own directory and includes:
+### [FAMATH Enrollment Ecosystem](famath-enrollment-ecosystem/)
 
-### **overview.md**  
-High-level description of the system and the operational problem.
+Complete enrollment management system for higher education. Three integrated components: admin backoffice for operational workflows, student portal for enrollment and payments, and WhatsApp conversational agent for automated enrollment. Shared database with RLS policies, async processing for WhatsApp ingestion, synchronous flows for portal operations.
 
-### **architecture.md**  
-Architecture, components, boundaries, and design rationale.
+**Technologies**: Node.js, Fastify, Next.js, Supabase, BullMQ, Z-API, OpenAI, Asaas
 
-### **key-flows.md**  
-Core flows that define system behavior.
+### [Controle Financeiro Nexly](controle-financeiro-nexly/)
 
-### **technical-decisions.md**  
-Major technical choices and alternatives considered.
+Multi-tenant financial management SaaS platform. Handles transaction management, recurring rules with versioning, DRE generation, and financial forecasting. Plan-based feature limits, CSV import processing, and multi-tenant data isolation via Row Level Security.
 
-### **challenges.md**  
-Non-trivial problems and how they were resolved.
+**Technologies**: Python, FastAPI, Next.js, Supabase, PostgreSQL, Pydantic
 
-### **representative-snippets.md**  
-Selected code excerpts demonstrating architectural patterns.
+### [Fintech CRM Platform](fintech-crm-platform/)
 
-### **results.md**  
-Delivered outcomes, stability, and business impact.
+CRM platform for real estate and vehicle financing with AI-powered lead qualification via WhatsApp. Dual WhatsApp sessions (consultant and AI agent), round-robin lead distribution, real-time Kanban board with WebSocket synchronization, and integrated chat interface.
 
-All cases follow the same structure for consistency and clarity.
+**Technologies**: Node.js, Fastify, React, Prisma, PostgreSQL, Baileys, Groq, Socket.io
 
----
+## Engineering Practices Demonstrated
 
-## Included Case Studies
+These case studies illustrate production-grade engineering practices:
 
-### Enrollment and Academic Systems
-- **famath-enrollment-portal** – Student enrollment portal with pricing engine and document intake  
-- **famath-enrollment-admin** – Administrative enrollment and validation flow  
-- **famath-whatsapp-agent** – Deterministic conversational agent for enrollment automation
+- **Retries and backoff** – Exponential backoff strategies for transient failures
+- **Timeouts** – Request and operation timeouts to prevent resource exhaustion
+- **Idempotency** – Safe retry mechanisms and duplicate handling
+- **Async processing** – Queue-based job processing with BullMQ, Go workers, ticker-based polling
+- **Observability** – Structured logging, metrics collection, distributed tracing
+- **Multi-tenant isolation** – Row Level Security, tenant boundaries, data separation
+- **Security boundaries** – Authentication, authorization, sensitive data handling
+- **Reliability patterns** – Failure handling, graceful degradation, circuit breakers
 
-### CRM and Lead Intelligence
-- **inmov-crm-platform** – CRM platform with WhatsApp ingestion and AI SDR agent
+## Technology Stack
 
-### Financial SaaS
-- **dre-saas-platform** – Multi-tenant DRE and financial control system (FastAPI + Supabase)
+**Languages**: Python, TypeScript, JavaScript, Go
 
-### Analytics and Data
-- **silva-analytics-platform** – Customer intelligence and analytics platform with RFM modeling
+**Backend**: FastAPI, Fastify, Express, Node.js, Gin, Prisma, SQLAlchemy
 
-### Observability and Integrations
-- **opsforge-platform** – Webhook delivery, retries, and monitoring (Go + Next.js)
+**Frontend**: React, Next.js, Vite, TypeScript, Tailwind CSS
 
----
+**Datastores**: PostgreSQL, Supabase, Redis
 
-## Technology Scope
+**Infrastructure**: Docker, Docker Compose, Render, Vercel
 
-The systems documented here involve:
+**Real-time & Messaging**: WebSocket, SSE, Webhooks, BullMQ
 
-- **Languages:** Python, TypeScript, JavaScript, Go  
-- **Backend:** FastAPI, Fastify, Node.js, Prisma, SQLAlchemy  
-- **Frontend:** React, Next.js  
-- **Datastores:** PostgreSQL, Supabase, Redis  
-- **Infrastructure:** Docker, Render, Vercel  
-- **Real-Time & Messaging:** SSE, Webhooks, BullMQ  
-- **AI & Automation:** LLM orchestration, domain-bounded agents, OpenAI, Groq  
+**AI & Automation**: LLM orchestration, OpenAI, Groq, domain-bounded conversational agents
 
-Each case focuses on applied engineering and architectural clarity.
+**Observability**: Prometheus, OpenTelemetry, Grafana, structured logging (Pino, zap, Winston)
 
----
+## Reference Architecture
+
+For detailed architecture documentation and design patterns, see: [Reference Architecture Documentation](https://sequoia-architecture-docs.vercel.app/)
 
 ## Notes
 
-No proprietary code or client-specific data is included.  
-All examples and explanations are limited to architectural reasoning and high-level implementation concepts.
+All case studies follow a consistent structure for readability. Metrics and outcomes are based on production observations where available. For systems in active development, "Planned" sections indicate future work and current limitations.
