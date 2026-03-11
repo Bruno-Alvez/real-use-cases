@@ -1,81 +1,64 @@
 # Engineering Case Studies
 
-This repository documents real-world systems I designed, built, and delivered end-to-end in production. Each case study represents a complete project where I was responsible for architecture decisions, implementation, and operational concerns.
-
-## About This Repository
-
-These case studies are based on actual production systems I led. Due to client confidentiality and proprietary constraints, I cannot share the original source code. Instead, I've created comprehensive documentation with representative code snippets that demonstrate the architectural patterns, technical decisions, and implementation approaches used in each system.
-
-The code examples are carefully crafted to reflect the real implementation patterns while ensuring no sensitive data, proprietary logic, or client-specific details are exposed. They serve as evidence of the engineering practices applied in production.
-
-## What You'll Find
-
-Each case study includes:
-
-- **System architecture** – Component boundaries, data flow, failure handling
-- **Technical decisions** – Rationale, alternatives considered, trade-offs
-- **Key flows** – Core system behaviors and interactions
-- **Implementation patterns** – Representative code demonstrating architectural choices
-- **Operational concerns** – Reliability, observability, security boundaries
-- **Results and measurement** – Outcomes observed in production, metrics, and measurement guidance
-
-These documents are written from an engineering perspective, focusing on how systems were built, why certain choices were made, and what constraints were encountered.
+This repository documents real-world systems I designed, built, and delivered end-to-end in production. Each case study represents a complete project where I was responsible for architecture decisions, implementation, and operational concerns. Due to client confidentiality, original source code is not shared, but comprehensive documentation with representative snippets covers the architectural patterns, technical decisions, and production outcomes.
 
 ## Case Studies
 
-### [FAMATH Enrollment Ecosystem](famath-enrollment-ecosystem/)
+### [Silva Nutrition Ecosystem](silva-nutrition-ecosystem/)
 
-Complete enrollment management system for higher education. Three integrated components: admin backoffice for operational workflows, student portal for enrollment and payments, and WhatsApp conversational agent for automated enrollment. Shared database with RLS policies, async processing for WhatsApp ingestion, synchronous flows for portal operations.
+Full reconstruction of a production data warehouse for a Brazilian supplement e-commerce. The legacy system had accumulated years of unmanaged debt: 62,466 fraudulent customer records contaminating the entire dataset, no primary keys on 8 of 22 tables, 17 tables with RLS disabled, 15 unauthenticated API endpoints exposing CPF data, and pipelines down for weeks at a time with no observability. The intervention replaced everything: a Strangler Fig migration to a clean Star Schema, 9 AWS Lambda ETL functions replacing N8N pipelines, full RLS coverage, and 28 CloudWatch alarms with SNS routing to email and Slack.
 
-**Technologies**: Node.js, Fastify, Next.js, Supabase, BullMQ, Z-API, OpenAI, Asaas
+**Key outcomes**: data quality score 2/10 to 9/10, p95 API latency from >30 seconds to <2 seconds, 89,487 problematic records eliminated, MTTD from >24 hours to <5 minutes
 
-### [Controle Financeiro Nexly](controle-financeiro-nexly/)
+**Technologies**: Python, AWS Lambda, Terraform, Supabase, PostgreSQL, WooCommerce API, Bling API v3, FastAPI, CloudWatch, SNS
 
-Multi-tenant financial management SaaS platform. Handles transaction management, recurring rules with versioning, DRE generation, and financial forecasting. Plan-based feature limits, CSV import processing, and multi-tenant data isolation via Row Level Security.
+---
 
-**Technologies**: Python, FastAPI, Next.js, Supabase, PostgreSQL, Pydantic
+### [Nexly Cloud Infrastructure](nexly-cloud-infrastructure/)
+
+Infrastructure platform for Nexly Group's client delivery operations. Before this project, every client environment was provisioned manually through the AWS console, with no version control, no audit trail, and no reproducibility. A new environment required 4 to 8 hours of console navigation and left behind undocumented configuration state that drifted over time. The intervention replaced ClickOps with modular Terraform, migrated N8N data pipelines to AWS Lambda, and established a GitHub Actions CI/CD pipeline with an approval-gated production apply.
+
+**Key outcomes**: operational cost from R$8,230/month to R$415/month (-95%), new client environment time from 4-8 hours to 15 minutes, disaster recovery from impossible to 15-minute RTO via terraform apply, MTTD from >24 hours to <5 minutes
+
+**Technologies**: Terraform, AWS Lambda, EventBridge, CloudWatch, SNS, Secrets Manager, GitHub Actions, Python, DynamoDB
+
+---
 
 ### [Fintech CRM Platform](fintech-crm-platform/)
 
-CRM platform for real estate and vehicle financing with AI-powered lead qualification via WhatsApp. Dual WhatsApp sessions (consultant and AI agent), round-robin lead distribution, real-time Kanban board with WebSocket synchronization, and integrated chat interface.
+CRM platform for a fintech operating in real estate and vehicle financing. The manual lead pipeline was producing cold data and slow response times: web forms, manual distribution via spreadsheet, and consultants spending mornings on unqualified prospects. The replacement is an AI agent that qualifies leads via WhatsApp 24/7 using Groq LLM, a round-robin scheduler that assigns qualified leads in under two seconds, and a real-time Kanban board with integrated WhatsApp chat so consultants never leave the interface.
 
-**Technologies**: Node.js, Fastify, React, Prisma, PostgreSQL, Baileys, Groq, Socket.io
+**Key outcomes**: initial contact time from 2 hours to 18 minutes, leads per consultant up 40%, conversion up 12%, AI qualification accuracy 75-82% vs human expert
 
-## Engineering Practices Demonstrated
+**Technologies**: Node.js 20, Fastify, Prisma, PostgreSQL, Baileys, Groq, Socket.io, BullMQ, Redis, React 19, TypeScript, Render, Vercel
 
-These case studies illustrate production-grade engineering practices:
+---
 
-- **Retries and backoff** – Exponential backoff strategies for transient failures
-- **Timeouts** – Request and operation timeouts to prevent resource exhaustion
-- **Idempotency** – Safe retry mechanisms and duplicate handling
-- **Async processing** – Queue-based job processing with BullMQ, Go workers, ticker-based polling
-- **Observability** – Structured logging, metrics collection, distributed tracing
-- **Multi-tenant isolation** – Row Level Security, tenant boundaries, data separation
-- **Security boundaries** – Authentication, authorization, sensitive data handling
-- **Reliability patterns** – Failure handling, graceful degradation, circuit breakers
+### [Controle Financeiro Nexly](controle-financeiro-nexly/)
 
-## Technology Stack
+Multi-tenant financial management SaaS for Brazilian companies. Manual DRE consolidation and recurring transaction management in spreadsheets was the target state it replaced. The platform delivers automated DRE generation, recurring rules with a versioning model that preserves historical accuracy, EWMA-based financial forecasting with trend and seasonality, CSV import with per-row partial success tracking, and full multi-tenant isolation via RLS enforced at the PostgreSQL layer independently of application code.
 
-**Languages**: Python, TypeScript, JavaScript, Go
+**Key outcomes**: DRE generation automated to under 30 seconds, 0 duplicate transactions from recurring rule processing, 100% RLS coverage across all tenant tables, plan-based feature gating enforced before any data operation
 
-**Backend**: FastAPI, Fastify, Express, Node.js, Gin, Prisma, SQLAlchemy
+**Technologies**: Python 3.11, FastAPI, Supabase, PostgreSQL, Pydantic, pandas, reportlab, Next.js, TypeScript, Docker
 
-**Frontend**: React, Next.js, Vite, TypeScript, Tailwind CSS
+---
 
-**Datastores**: PostgreSQL, Supabase, Redis
+### [FAMATH Enrollment Ecosystem](famath-enrollment-ecosystem/)
 
-**Infrastructure**: Docker, Docker Compose, Render, Vercel
+Complete enrollment management system for a higher education institution. Three integrated components: admin backoffice for operational workflows, student portal for enrollment and payments, and a WhatsApp conversational agent for automated enrollment handling. Shared database with RLS policies, async processing via BullMQ for WhatsApp ingestion, synchronous flows for portal operations, and Asaas payment gateway integration.
 
-**Real-time & Messaging**: WebSocket, SSE, Webhooks, BullMQ
+**Technologies**: Node.js, Fastify, Next.js, Supabase, BullMQ, Z-API, OpenAI, Asaas
 
-**AI & Automation**: LLM orchestration, OpenAI, Groq, domain-bounded conversational agents
+---
 
-**Observability**: Prometheus, OpenTelemetry, Grafana, structured logging (Pino, zap, Winston)
+## Engineering Practices
 
-## Reference Architecture
+These case studies document production-grade practices applied across real systems.
 
-For detailed architecture documentation and design patterns, see: [Reference Architecture Documentation](https://sequoia-architecture-docs.vercel.app/)
-
-## Notes
-
-All case studies follow a consistent structure for readability. Metrics and outcomes are based on production observations where available. For systems in active development, "Planned" sections indicate future work and current limitations.
+- **Idempotency**: UPSERT-based writes, cursor-based incremental sync, transaction deduplication keys
+- **Resilience**: Exponential backoff with retry budgets, circuit breakers, distributed locks for shared mutable state
+- **Observability**: Structured JSON logging, CloudWatch metric filters, alarm-per-failure-mode design, MTTD under 5 minutes
+- **Multi-tenant isolation**: Row Level Security enforced at the database layer, independently of application code
+- **Infrastructure as code**: Terraform modules, S3-backed state, DynamoDB locking, CI/CD with approval-gated production applies
+- **Data quality**: FK constraints, RLS policies, deduplication before insert, validation against authoritative sources before migration

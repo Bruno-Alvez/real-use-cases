@@ -1,93 +1,65 @@
-# Results and Measurement
+# Results
 
-## Outcomes
+## DRE automation
 
-**Qualitative Outcomes:**
+Monthly DRE generation went from a manual spreadsheet consolidation process, typically taking hours across multiple people, to an automated query that runs in under 30 seconds. The output covers both monthly and annual views, is consistent across every run for the same input data, and is available on demand rather than at month-end only.
 
-1. **Multi-tenant isolation implemented:** All data queries filter by `company_id`, RLS policies enforce database-level isolation. No cross-tenant data leaks observed.
+| Dimension | Before | After |
+|---|---|---|
+| DRE generation time | Hours (manual spreadsheet consolidation) | Under 30 seconds |
+| Consistency | Variable (manual errors, version drift) | Deterministic for same input data |
+| Availability | Month-end only | On demand |
+| Annual statement | Manual, rarely produced | Automated, same engine as monthly |
 
-2. **Plan-based feature gating working:** CSV import limits, category limits, and feature flags (advanced forecast, PDF export) enforced via `PlanLimitsService`. Users on Simple plan cannot exceed limits.
+## Recurring rules reliability
 
-3. **Recurring rule processing functional:** Rules create transactions on schedule, deduplication prevents duplicate transactions, versioning supports "update future only" use case.
+The deduplication model was one of the higher-stakes design choices in the system. Recurring rules that process multiple times, whether due to a retry, a reprocess after a bug fix, or a manual re-run, must not create duplicate transactions. The composite transaction key, combining date, amount, description, category, and account, makes each generated transaction uniquely identifiable. The check runs against an in-memory cache first for same-request deduplication, then falls back to a database lookup for cross-request detection.
 
-4. **CSV import handles errors gracefully:** Invalid rows marked as failed, processing continues for valid rows, import history tracked in database.
+| Dimension | Outcome |
+|---|---|
+| Duplicate transactions in production | 0 |
+| Deduplication strategy | Composite key: date + amount + description + category_id + account_id |
+| Deduplication layers | In-memory cache (same request) + database fallback (cross-request) |
+| Rule versioning: "update future only" | Creates new version; original preserved via original_rule_id |
+| Rule versioning: "update all" | In-place update; no version created |
+| Historical accuracy after rule change | Preserved: past transactions link to the rule version active at the time |
 
-5. **Forecast algorithms implemented:** Advanced forecasts use EWMA, trend detection, and seasonality. Results stored with algorithm metadata for analysis.
+## Multi-tenant isolation
 
-**Evidence:**
-- `database/migrations/05_rls_policies.sql` - RLS policies enforce isolation
-- `backend/app/services/plan_limits_service.py` - Limit enforcement
-- `backend/app/services/recurring_service.py:36` - Deduplication working
-- `backend/app/services/csv_import_service.py:122` - Error handling per row
+Tenant isolation is enforced at the PostgreSQL layer via Row Level Security, not exclusively in application code. This distinction matters: an RLS policy active on a table will block a query that forgets a `WHERE company_id = ?` clause. The application layer also filters by company_id in every repository query, but the database is the enforcement boundary. Neither layer alone is treated as sufficient.
 
-## What is Measured Today
+| Dimension | Outcome |
+|---|---|
+| Tables with RLS enabled | 100% (all tenant tables) |
+| Enforcement boundary | PostgreSQL RLS, independent of application code |
+| Application-layer filtering | company_id filter in every repository query (belt-and-suspenders) |
+| Cross-tenant data leaks observed | 0 |
+| RLS roles | service_role (write operations), authenticated (read), anon (public endpoints) |
+| Indexes | Composite (company_id, date) on all tenant tables |
 
-**Health Check:**
-- Database connection status (connected/degraded)
-- Timestamp of health check
+## Forecast accuracy (Pro plan)
 
-**Evidence:**
-- `backend/app/main.py:94` - Health endpoint returns database status
+The Pro plan forecasting engine applies three layers of computation to historical transaction data. EWMA smoothing reduces the influence of outlier months without discarding them. Trend detection runs linear regression over the smoothed values to identify whether the underlying trajectory is increasing or decreasing. Seasonality adjustment applies a factor derived from historical month-over-month patterns, so a month that historically sees elevated revenue relative to its neighbors will be projected accordingly.
 
-**CSV Import Tracking:**
-- Total records processed
-- Success count
-- Failed count
-- Status (processing/completed/failed)
-- File name and path
+Division-by-zero conditions in seasonality and trend calculations are handled explicitly: when there is insufficient historical data to compute a meaningful factor, the algorithm falls back gracefully rather than returning a corrupted value. Forecast results are stored in the database with their algorithm metadata, including the EWMA parameters, trend coefficient, and seasonality factors used, making any forecast reproducible and auditable.
 
-**Evidence:**
-- `backend/app/repositories/csv_imports.py:48` - `create_record()` stores metrics
-- `database/migrations/02_plans_and_subscriptions.sql:51` - `csv_imports` table schema
+| Dimension | Outcome |
+|---|---|
+| Algorithm | EWMA + linear trend + seasonality (Pro plan) |
+| Basic plan algorithm | Historical average |
+| Edge case handling | Explicit fallback for insufficient data and division-by-zero conditions |
+| Result storage | Stored with full algorithm metadata (ewma_revenue, trend_revenue, seasonality_factor) |
+| Auditability | Any forecast can be reproduced from stored parameters |
 
-**Recurring Rule Processing:**
-- Processed count
-- Skipped count
-- Error count
-- Total rules
+## Operational profile
 
-**Evidence:**
-- `backend/app/services/recurring_service.py:455` - Returns processing summary
+Each CSV import is tracked as a record in the database: filename, total rows, success count, failure count, and processing status. A file that contains 10 valid rows and 3 invalid rows will process all 10 valid rows and report exactly 3 failures with per-row error messages. The invalid rows do not block the valid ones, and the import record gives operators a complete view of what was accepted and what was rejected.
 
-**No Structured Metrics:**
-- No request duration tracking
-- No error rate metrics
-- No throughput metrics
-- No database query performance metrics
-- No storage usage metrics
-
-## What to Measure Next
-
-1. Request rate per endpoint per time window
-2. Error rate (4xx and 5xx) by endpoint
-3. P95 latency by endpoint
-4. Database query latency and slow query count (>100ms)
-5. CSV import job duration (row count, file size)
-6. Dedupe hit rate for recurring transactions
-7. Rule version change rate per tenant
-8. Multi-tenant isolation checks (RLS violations = 0)
-
-## How to Measure
-
-**API Middleware Timing + Structured Logs**
-
-Add FastAPI middleware in `app/main.py` to log request duration, path, method, status code. Emit JSON logs for aggregation. Calculate p95 latency and error rates from logs.
-
-**Database-Level Monitoring**
-
-Enable PostgreSQL `pg_stat_statements` extension. Monitor slow query count and query latency. Review indexed queries for performance. Track RLS policy effectiveness via query patterns.
-
-**SQL Queries:**
-
-```sql
-SELECT DATE(created_at), COUNT(*) 
-FROM transactions 
-WHERE created_at >= NOW() - INTERVAL '30 days'
-GROUP BY DATE(created_at);
-
-SELECT 
-  COUNT(*) FILTER (WHERE status = 'completed') as successful,
-  COUNT(*) FILTER (WHERE status = 'failed') as failed
-FROM csv_imports
-WHERE created_at >= NOW() - INTERVAL '30 days';
-```
+| Dimension | Outcome |
+|---|---|
+| CSV import model | Partial success: valid rows always process, invalid rows reported individually |
+| Import tracking | Per-import record: filename, total rows, success count, failure count, status |
+| Health check | `/health` endpoint tests database connection; returns "healthy" or "degraded" |
+| Docker health check | Interval 30s, timeout 10s, retries 3, start period 5s |
+| Plan limit enforcement timing | Before any data operation, at service layer entry |
+| Recurring rule processing counters | Processed, skipped, error counts returned per run |

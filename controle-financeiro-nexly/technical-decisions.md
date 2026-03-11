@@ -1,309 +1,97 @@
 # Technical Decisions
 
-## Decision 1: Manual JWT Token Decoding vs Signature Verification
-
-**Decision:** Decode JWT payload manually via base64 for development context resolution. Signature verification required for production.
-
-**Alternatives Considered:**
-- Use `jose.jwt.decode()` with Supabase JWT secret for signature verification
-- Call Supabase Auth API to validate token
-- Use Supabase client's built-in auth methods
-
-**Why Chosen:**
-- Faster context resolution during development
-- Simpler MVP implementation
-- Token structure and expiration validation sufficient for development
-- Enables rapid iteration on multi-tenant context resolution
-
-**Consequences:**
-- Tokens with invalid signatures accepted if structure is valid
-- Cannot detect token tampering
-- Not suitable for production
-
-**Production Requirements:**
-- Verify signature using provider JWT secret or JWKS endpoint
-- Validate issuer and audience claims
-- Reject tokens without valid signature
-- Implement token refresh mechanism
-
-**Evidence:**
-- `backend/app/core/security.py:42` - Manual base64url_decode implementation
-- `backend/app/core/security.py:44` - Comment notes signature verification should be added
-
-## Decision 2: Synchronous Processing vs Async Queues
-
-**Decision:** Process recurring rules and CSV imports synchronously within HTTP request handlers. Architecture designed to migrate heavy operations to background queues when volume requires.
-
-**Alternatives Considered:**
-- Background job queue (Celery, RQ, BullMQ)
-- Async task processing with FastAPI BackgroundTasks
-- Scheduled cron jobs for recurring rules
-
-**Why Chosen:**
-- Simpler initial architecture (no queue infrastructure)
-- Faster MVP implementation
-- No additional infrastructure dependencies
-- Immediate feedback to user
-- Service layer separation enables queue migration without API changes
-
-**Consequences:**
-- Long-running operations block HTTP requests
-- No retry mechanism for failed processing
-- Cannot scale processing independently
-- Timeout risk for large CSV files
-
-**Design Intent:**
-- Service layer abstraction allows queue insertion without changing API contracts
-- CSV import and forecast generation are candidates for background processing
-- Recurring rule processing can move to scheduled jobs when needed
-
-**Future Improvements:**
-- Move CSV import to background task with job status endpoint
-- Use queue system for recurring rule processing
-- Add job status tracking table
-- Implement retry logic with exponential backoff
-
-**Evidence:**
-- `backend/app/services/recurring_service.py:337` - Synchronous loop processing
-- `backend/app/services/csv_import_service.py:41` - Synchronous CSV processing
-- No queue/worker code found in codebase
-
-## Decision 3: In-Memory Deduplication Cache vs Database-Only
-
-**Decision:** Use in-memory Set cache for transaction deduplication during recurring rule processing, with database fallback.
-
-**Alternatives Considered:**
-- Database-only duplicate check (query before each insert)
-- Unique constraint on transaction table
-- External cache (Redis)
-
-**Why Chosen:**
-- Reduces database queries during batch processing
-- Fast lookup for same-request duplicates
-- Database check still validates against existing data
-- No external dependencies
-
-**Consequences:**
-- Cache is request-scoped (not shared across requests)
-- Multiple concurrent requests could create duplicates
-- Memory usage scales with number of rules processed
-
-**Future Improvements:**
-- Add unique constraint: `UNIQUE(company_id, date, amount, description, category_id, account_id)`
-- Use database-level deduplication
-- Consider distributed cache if scaling horizontally
-
-**Evidence:**
-- `backend/app/services/recurring_service.py:287` - `processed_cache: Set[str]` parameter
-- `backend/app/services/recurring_service.py:60` - Cache check before database query
-- `backend/app/services/recurring_service.py:36` - Transaction key generation
-
-## Decision 4: Company ID Resolution via Database Query vs Token Claims
-
-**Decision:** Query `company_users` table on each request to resolve `company_id` from `user_id`.
-
-**Alternatives Considered:**
-- Include `company_id` in JWT token claims
-- Cache company_id in session or token
-- Single company per user assumption
-
-**Why Chosen:**
-- Supports future multi-company per user feature
-- Single source of truth (database)
-- Handles company membership changes immediately
-- No token refresh needed when company changes
-
-**Consequences:**
-- Extra database query on every authenticated request
-- Slight latency overhead
-- Database load scales with request volume
-
-**Future Improvements:**
-- Cache company_id in request context after first lookup
-- Consider including in token if single-company assumption holds
-- Add database index on `(user_id, company_id)` if not exists
-
-**Evidence:**
-- `backend/app/core/security.py:143` - `get_current_company_id()` queries database
-- `backend/app/core/security.py:170` - Queries `company_users` table
-
-## Decision 5: Plan Limits as Service vs Middleware
-
-**Decision:** Centralize plan limit checks in `PlanLimitsService` called explicitly from service layer.
-
-**Alternatives Considered:**
-- Middleware that intercepts requests
-- Database triggers
-- Feature flags in token claims
-
-**Why Chosen:**
-- Explicit and visible in code flow
-- Easy to test in isolation
-- Flexible (can check multiple limits in one call)
-- No magic behavior
-
-**Consequences:**
-- Must remember to call limit checks in each feature
-- Risk of forgetting to add checks
-- Duplicate code if checks needed in multiple places
-
-**Future Improvements:**
-- Decorator pattern for automatic limit checking
-- Middleware for common endpoints
-- Database-level constraints where possible
-
-**Evidence:**
-- `backend/app/services/plan_limits_service.py:38` - Service implementation
-- `backend/app/services/csv_import_service.py:46` - Explicit call to `ensure_can_import_csv()`
-
-## Decision 6: Supabase Client Singleton vs Per-Request
-
-**Decision:** Global singleton Supabase client instance with service role key.
-
-**Alternatives Considered:**
-- Create new client per request
-- Connection pooling via SQLAlchemy
-- Direct PostgreSQL connection
-
-**Why Chosen:**
-- Supabase Python client handles connection management
-- Service role key bypasses RLS (needed for server-side operations)
-- Singleton reduces initialization overhead
-- Simpler than managing connection pools
-
-**Consequences:**
-- All operations use service role (bypasses RLS)
-- Must manually filter by `company_id` in all queries
-- No per-request connection isolation
-- Potential security risk if `company_id` filtering is missed
-
-**Future Improvements:**
-- Add repository-level validation that `company_id` is always filtered
-- Consider connection pooling for high concurrency
-- Add query logging to detect missing filters
-
-**Evidence:**
-- `backend/app/core/database.py:15` - Global `_supabase_client` variable
-- `backend/app/core/database.py:32` - Singleton pattern with service role key
-- `backend/app/core/database.py:21` - Comment notes RLS bypass
-
-## Decision 7: Recurring Rule Versioning vs In-Place Updates
-
-**Decision:** Create new rule version when updating future transactions only, update existing rule when updating all transactions.
-
-**Alternatives Considered:**
-- Always create new version
-- Always update in place
-- Soft delete old rule, create new
-
-**Why Chosen:**
-- Supports "update all" vs "update future only" use cases
-- Maintains history via `original_rule_id` and `effective_from_date`
-- Allows querying active version via `superseded_by IS NULL`
-- Preserves audit trail
-
-**Consequences:**
-- More complex update logic
-- Multiple versions in database
-- Must filter out superseded versions in queries
-- Transaction linking to correct version
-
-**Future Improvements:**
-- Add version history endpoint
-- Consider time-travel queries for historical forecasts
-- Add version comparison UI
-
-**Evidence:**
-- `backend/app/services/recurring_service.py:123` - `update_smart()` method
-- `backend/app/services/recurring_service.py:203` - `create_rule_version()` call
-- `backend/app/repositories/recurring_repository.py` - Versioning logic
-
-## Decision 8: CSV Import Row-by-Row vs Batch Insert
-
-**Decision:** Process CSV rows sequentially, creating transactions one at a time.
-
-**Alternatives Considered:**
-- Batch insert all valid rows in single transaction
-- Validate all rows first, then insert batch
-- Stream processing for large files
-
-**Why Chosen:**
-- Simpler error handling (per-row status)
-- Immediate validation feedback
-- Can return partial results if some rows fail
-- No transaction rollback complexity
-
-**Consequences:**
-- Slower for large files (N database writes)
-- No atomicity (partial success possible)
-- Higher database load
-- No transaction-level rollback
-
-**Future Improvements:**
-- Batch insert valid rows in chunks (e.g., 100 at a time)
-- Use database transaction for all-or-nothing import option
-- Add progress tracking for large files
-- Consider async processing with job status
-
-**Evidence:**
-- `backend/app/services/csv_import_service.py:80` - Sequential row processing loop
-- `backend/app/services/csv_import_service.py:148` - Individual `transaction_service.create()` calls
-
-## Decision 9: Forecast Algorithm Storage vs On-Demand Calculation
-
-**Decision:** Store forecast results with algorithm metadata (EWMA, trend, seasonality) in database.
-
-**Alternatives Considered:**
-- Calculate on-demand from historical data
-- Cache in memory/Redis
-- Store only final values
-
-**Why Chosen:**
-- Fast retrieval for dashboard
-- Can compare algorithm results over time
-- Supports debugging and algorithm tuning
-- Historical forecast accuracy tracking
-
-**Consequences:**
-- More database storage
-- Must recalculate when historical data changes
-- Schema includes algorithm-specific fields
-
-**Future Improvements:**
-- Add recalculation trigger on transaction updates
-- Version algorithm parameters
-- Store algorithm version for comparison
-
-**Evidence:**
-- `database/migrations/03_migrate_tables_to_company_id.sql` - Forecast table includes `ewma_revenue`, `trend_revenue`, `seasonality_factor`
-- `backend/app/services/forecast_service.py:141` - Stores algorithm results
-
-## Decision 10: Storage Service Direct REST API vs Python Client
-
-**Decision:** Use direct REST API with httpx for avatar uploads, Supabase Python client for other uploads.
-
-**Alternatives Considered:**
-- Use Python client for all uploads
-- Use only REST API
-- Use only Python client
-
-**Why Chosen:**
-- Python client had content-type issues for avatars
-- REST API allows explicit header control
-- Other uploads work fine with Python client
-- Fallback to REST when client fails
-
-**Consequences:**
-- Inconsistent upload methods
-- More code to maintain
-- Direct API calls require manual URL construction
-
-**Future Improvements:**
-- Standardize on one method
-- Fix Python client content-type handling
-- Add retry logic for upload failures
-
-**Evidence:**
-- `backend/app/services/storage_service.py:195` - Direct REST API for avatars
-- `backend/app/services/storage_service.py:260` - Python client for CSV uploads
-- `backend/app/services/storage_service.py:188` - Comment about content-type issues
+## Recurring rule versioning via new records over in-place updates
+
+The "update future only" use case requires that past transactions remain associated with the rule definition that was active when they were created. An in-place update destroys that link: after the update, there is no way to reconstruct what the rule said before.
+
+The decision was to treat each rule change with future scope as a record creation event, not a mutation event. The current rule is marked as superseded and a new record is created with `original_rule_id` pointing back to the chain origin and `effective_from_date` marking when the new version takes over. Each version stores its full rule definition, not a diff, so any version is independently readable.
+
+The "update all" path uses in-place mutation because there is no historical divergence to preserve: the user is saying the old rule was wrong and all transactions should reflect the correction.
+
+**Alternatives considered:** soft delete with recreation (adds deletion semantics that don't apply here), event sourcing (more expressive but significantly more complex for this use case), single version table with audit log (separates the history from the active record in a way that makes common queries harder).
+
+**Trade-offs accepted:** Multiple version records per rule means queries for the active rule must filter on `superseded_by IS NULL`. Joining transactions back to their rule version requires walking the `original_rule_id` chain. These are acceptable costs for a system where historical accuracy is a core correctness requirement.
+
+---
+
+## RLS and company_id double enforcement
+
+The most dangerous class of bug in a multi-tenant system is a data leak: one tenant's data returned to another tenant's request. Application code can have this bug, whether through a missing `WHERE` clause, a cached query result, or an unexpected code path. The question is what happens when it does.
+
+The decision was to treat RLS and application-layer `company_id` filtering as two independent enforcement layers, neither of which is assumed to be sufficient on its own. Every tenant table has an RLS policy that evaluates `company_id` against the session context. Every repository method includes an explicit `company_id` filter. If the application layer fails, the database layer catches it. If the RLS policy is misconfigured for a specific query pattern, the application layer catches it.
+
+This is belt-and-suspenders engineering. It adds a small amount of redundancy to every query, and that redundancy is intentional.
+
+The Supabase client runs with the `service_role` key, which bypasses RLS. This is necessary for server-side operations that span tenants or that need elevated privileges. The mitigation is that all queries go through the repository layer, where `company_id` filtering is consistently applied. The RLS policies serve as the backstop for any case where a query escapes the repository pattern.
+
+**Alternatives considered:** trust application layer only (eliminates one layer of protection with no upside), trust RLS only (makes the application code fragile to any future change in the client credential model), include company_id in JWT claims (creates a synchronization problem when company membership changes).
+
+**Trade-offs accepted:** The `company_users` lookup on every authenticated request adds one database round-trip per API call. This cost is accepted in exchange for membership state that is always current, without requiring token refresh when a user's company access changes.
+
+---
+
+## Synchronous processing for CSV import and recurring rules
+
+Heavy operations, CSV parsing and transaction insertion, recurring rule evaluation across all active rules, are processed synchronously within the HTTP request. This is a deliberate choice for the current operational profile, not a deferred task.
+
+The service layer is structured as a strict boundary between the router and the repository: routers call service methods, service methods contain business logic, repositories handle data access. This boundary means the processing logic has no dependency on the HTTP request/response cycle. Migrating a service method to be invoked by a background queue worker instead of an HTTP handler requires changing the invocation site, not the method itself.
+
+The synchronous approach provides immediate feedback to the caller: a CSV import returns a complete result, including per-row success and failure, within the response. An async model would require a polling or webhook mechanism to deliver that result, adding complexity that is not justified by the current data volumes.
+
+**Alternatives considered:** FastAPI BackgroundTasks (defers work but loses response-level feedback and provides no retry mechanism), Celery or RQ (adds infrastructure dependency and operational overhead not warranted at current scale), async task table with status polling (correct for high volume but premature for current workload).
+
+**Trade-offs accepted:** Long-running operations block the HTTP connection. A CSV file with thousands of rows will hold a connection open for its entire processing duration. This is the known constraint, and the service layer boundary ensures it can be addressed by introducing a queue without changing the business logic.
+
+---
+
+## Plan limits at the service layer over middleware
+
+Feature gating could live in middleware that intercepts requests before they reach the handler. The appeal is centralization: one place defines what is and isn't allowed per plan. The problem is that some limits are stateful, requiring a database query to evaluate (for example, "has this company reached its monthly import count?"), and middleware should not be making data access calls.
+
+The decision was to centralize limit logic in `PlanLimitsService`, which exposes a method per enforced limit, and to call those methods explicitly at the start of each relevant service method. The check happens before any data operation. If the limit is exceeded, no data is written and a structured error is returned.
+
+Explicit calls are visible in the code path. There is no indirection to trace when debugging why a request was rejected. The enforcement is testable in isolation by unit testing `PlanLimitsService` directly.
+
+**Alternatives considered:** middleware (can't access business context cleanly), database triggers (enforce after setup, can't provide useful error messages), decorator pattern (elegant but adds indirection that obscures where the check happens for each feature).
+
+**Trade-offs accepted:** Each new feature that has a plan limit must explicitly call the relevant check method. There is no mechanism that automatically enforces this. The discipline is maintained through code review rather than automated enforcement.
+
+---
+
+## In-memory deduplication cache with database fallback
+
+During recurring rule processing, the same rule might generate the same transaction twice within a single run if date ranges overlap. Checking the database for every potential duplicate adds N queries to a batch operation where N is the number of transactions being considered.
+
+The solution uses a two-level check. An in-memory set accumulates transaction keys for the current processing run. Before inserting a transaction, the key is checked against the set first. If not found, the database is queried. If neither check finds a match, the transaction is inserted and its key is added to the set.
+
+The in-memory cache is request-scoped and not shared across concurrent runs. This is an accepted constraint: in the current deployment model, the recurring rule processor runs as a single triggered call. If the processing model changes to support concurrent processing of different rule sets, the in-memory cache provides no cross-process deduplication and the database check becomes the sole mechanism.
+
+**Alternatives considered:** database-only check (correct but adds one query per transaction in a batch context), unique constraint on the transactions table (would also solve the problem at the database level but requires a schema change and changes the error model from a pre-check to an exception handler), Redis distributed cache (adds infrastructure dependency not justified at current scale).
+
+**Trade-offs accepted:** The in-memory cache does not protect against concurrent runs of the same processing job. The current deployment model makes this a non-issue, and the database fallback handles the cross-request case.
+
+---
+
+## Forecast results stored in the database over on-demand calculation
+
+Forecast generation involves EWMA smoothing over historical transactions, trend detection via linear regression, and seasonality factor computation. Running this on every dashboard request would mean re-reading all historical transactions and re-running the full computation for each page load.
+
+The decision was to store forecast results at generation time, including the intermediate values: `ewma_revenue`, `trend_revenue`, and `seasonality_factor`, alongside the final projected values. The dashboard reads stored results. Recalculation is triggered explicitly, either by the user requesting a fresh forecast or by a scheduled operation.
+
+Storing the intermediate values has an additional benefit: any stored forecast is auditable. Given the stored parameters, the output can be reconstructed independently, and changes in algorithm behavior across versions can be detected by comparing stored parameters against what the current algorithm would produce.
+
+**Alternatives considered:** on-demand calculation (correct output always, but expensive and adds latency to dashboard load), in-memory cache with TTL (avoids database writes but is lost on restart and doesn't support auditability), calculate and store only final values (cheaper storage but loses auditability).
+
+**Trade-offs accepted:** Stored forecasts become stale when new transactions are added. The system does not automatically invalidate and recalculate forecasts on transaction changes. Users see the forecast as of the last generation time, which is displayed alongside the forecast values.
+
+---
+
+## Composite indexes on (company_id, date) for all tenant tables
+
+Every meaningful query against a tenant table includes a `company_id` filter and a date range or date ordering. A single-column index on either field handles only half the query. An index on `(company_id, date)` covers the full predicate: the database can use the company_id prefix to narrow to the tenant's data, then use the date ordering within that partition to find the relevant range.
+
+This index structure becomes more important as individual tenant data volumes grow. A company with three years of transaction history will have a large partition of rows sharing their `company_id`. Without the composite index, a date range query within that company scans the full partition rather than seeking to the date range directly.
+
+**Alternatives considered:** single-column index on company_id (doesn't cover date range), single-column index on date (scans all tenants for a date range), no index beyond primary key (linear scan at scale).
+
+**Trade-offs accepted:** Write operations pay the cost of maintaining the composite index. For this workload, reads vastly outnumber writes, so the index maintenance cost is acceptable. Storage overhead is proportional to the number of tenant table rows, which is expected and planned for.

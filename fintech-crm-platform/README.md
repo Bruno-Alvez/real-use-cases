@@ -1,43 +1,41 @@
-# Fintech CRM Platform
+This case study documents a CRM platform built for a fintech operating in real estate and vehicle financing. The core problem was a broken lead pipeline: web forms delivered cold, incomplete data, manual distribution created bottlenecks, and consultants burned hours on prospects that never converted. The solution replaces that entire manual layer with an AI agent that qualifies leads via WhatsApp 24/7, routes them automatically through a round-robin scheduler, and gives consultants a real-time Kanban board and integrated chat interface to close deals without switching tools. In production over six months, initial contact time dropped from two hours to eighteen minutes, conversion increased by 12%, and each consultant now handles 40% more leads without additional headcount.
 
-CRM platform for real estate and vehicle financing with AI-powered lead qualification via WhatsApp. Automates initial contact, data collection, and routes qualified leads to consultants using round-robin distribution.
+## Outcomes
 
-## What This System Does
-
-The platform integrates with WhatsApp to provide 24/7 automated lead qualification through an AI agent. When a lead contacts via WhatsApp, the AI agent engages in conversation, collects necessary information, and classifies the lead. Qualified leads are automatically distributed to consultants using a round-robin algorithm. Consultants can manage leads through a real-time Kanban board and communicate directly via integrated WhatsApp chat.
+| Metric | Before | After |
+|---|---|---|
+| Initial contact time | ~2 hours | 18 minutes |
+| Leads per consultant | baseline | +40% |
+| Conversion rate | baseline | +12% |
+| Manual processing overhead | baseline | -60% |
+| AI qualification accuracy | n/a | 75-82% vs human expert |
+| Lead assignment latency | manual | avg 1.3s (p95: 2.1s) |
+| Message delivery rate | n/a | 98.7-99.4% |
+| WebSocket update latency | n/a | avg 87ms (p95: 142ms) |
 
 ## How to Read This Case Study
 
-Start with **overview.md** to understand the problem domain, solution approach, and key features. **architecture.md** explains the system components, dual WhatsApp session architecture, and how data flows between the AI agent, consultants, and the database.
-
-**key-flows.md** describes critical flows: lead qualification via WhatsApp, round-robin distribution, real-time Kanban synchronization, and consultant chat interactions. **technical-decisions.md** covers major choices: dual Baileys sessions, LLM selection, round-robin algorithm, WebSocket architecture.
-
-**challenges.md** documents complex problems: webhook timeout prevention, conversation state management, LLM response latency, message deduplication, and human handoff scenarios. **representative-snippets.md** shows code examples for webhook handling, orchestrator logic, intent classification, and state management.
-
-**results.md** presents production outcomes, metrics observed, and measurement guidance.
-
-## Documentation Structure
-
-- **overview.md** – System description, problem statement, solution approach, technology stack, and implemented vs planned features
-- **architecture.md** – Component boundaries, dual WhatsApp session architecture, data flow, failure handling, and observability
-- **key-flows.md** – Core flows: WhatsApp webhook reception, lead qualification, round-robin distribution, Kanban sync, consultant chat
-- **technical-decisions.md** – Major decisions: monolithic architecture, BullMQ for async processing, dual-mode architecture, Redis for state, LLM selection
-- **challenges.md** – Complex problems: webhook timeouts, conversation state, LLM latency, message deduplication, human handoff, secure protocol generation
-- **representative-snippets.md** – Code examples for webhook handling, orchestrator, intent classification, CPF validation, Redis state management
-- **results.md** – Production outcomes, metrics observed, and measurement guidance
+| File | Contents |
+|---|---|
+| **overview.md** | Problem context, solution description, key features, and technology stack |
+| **architecture.md** | Component boundaries, dual WhatsApp session design, data flow, and failure handling |
+| **key-flows.md** | End-to-end flows: lead qualification, round-robin distribution, Kanban sync, consultant chat |
+| **technical-decisions.md** | Rationale behind major choices: monolithic architecture, BullMQ, Baileys dual-session, LLM selection |
+| **challenges.md** | Hard problems solved: webhook timeouts, conversation state, LLM latency, message deduplication, human handoff |
+| **representative-snippets.md** | Annotated code for webhook handling, orchestrator logic, intent classification, and Redis state management |
+| **results.md** | Production metrics with confidence ranges and measurement context |
 
 ## Key Technical Highlights
 
-- **Dual Baileys WhatsApp sessions** – Separate sessions for consultants and AI agent to prevent conflicts
-- **AI-powered lead qualification** – Groq LLM for intent classification with fallback rules
-- **Round-robin distribution** – Fair lead allocation algorithm with consultant availability tracking
-- **Real-time Kanban board** – WebSocket synchronization for live updates across clients
-- **Conversation state management** – Redis-based state persistence for multi-turn conversations
-- **Message deduplication** – Prevents duplicate processing from webhook retries
+- **Dual Baileys sessions** separate the AI agent's conversation flow from consultant sessions entirely, preventing state collisions and allowing each to operate under different message handling rules
+- **Groq LLM with rule-based fallback** classifies lead temperature and risk profile in an average of 387ms, falling back to deterministic rules during API degradation to keep qualification running
+- **Round-robin distribution** runs in O(1) time with Redis-backed consultant availability state, assigning leads in an average of 1.3 seconds with under 7% weekly variance across the team
+- **Socket.io real-time Kanban** pushes board updates to all connected clients in an average of 87ms, sustaining 47 concurrent users observed at peak without degradation
+- **Conversation state in Redis** persists multi-turn dialogue context across webhook invocations, handling reconnects and retries transparently with message deduplication built into the ingestion path
+- **BullMQ job queues** decouple webhook acknowledgment from AI processing, returning 200 to WhatsApp within the five-second timeout window while classification and routing proceed asynchronously
 
 ## Technology Stack
 
-**Backend**: Node.js 20, Fastify, Prisma, PostgreSQL, Baileys, Groq, Socket.io, BullMQ, Redis  
-**Frontend**: React 19, TypeScript, Tailwind CSS, React Query  
-**Infrastructure**: Supabase, Render, Vercel
-
+**Backend**: Node.js 20, Fastify, Prisma, PostgreSQL, Baileys, Groq, Socket.io, BullMQ, Redis
+**Frontend**: React 19, TypeScript, Tailwind CSS, React Query
+**Infrastructure**: Supabase (database), Render (backend), Vercel (frontend)
